@@ -1,192 +1,65 @@
 <div align="center">
 
-
 <img src="Frontline/assets/banner.jpg" alt="FrontLine Lyrics" width="700"/>
 
 **Real-time, synced lyrics for whatever is playing on your PC.**
-
-[![Microsoft Store](https://img.shields.io/badge/Get%20it%20on-Microsoft%20Store-0078D4?logo=microsoft&logoColor=white)](https://get.microsoft.com/installer/download/9P6LNJCL8ZCC?referrer=appbadge&cid=readme)
-![C#](https://img.shields.io/badge/C%23-WPF-239120?logo=csharp&logoColor=white)
-![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
-![Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6?logo=windows&logoColor=white)
-![License](https://img.shields.io/badge/License-MIT-lightgrey)
-[![Contributors](https://img.shields.io/badge/Contributors-2-orange)](CONTRIBUTORS.md)
-
-<a href="https://get.microsoft.com/installer/download/9P6LNJCL8ZCC?referrer=appbadge&cid=readme" target="_self">
-  <img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
-</a>
-
-
-https://github.com/user-attachments/assets/0a6f3278-49b2-43f0-9004-6709d65f74b9
-
 
 </div>
 
 ---
 
-> **⚠️ This is not the original project.** This is a personal fork/enhancement of **[FrontLine Lyrics Desktop](https://github.com/juliocax/FrontLine-Lyrics-Desktop)** by [@juliocax](https://github.com/juliocax) and contributors — all credit for the original application goes to them. This fork adds a few extra features on top (overlay pin/click-through lock via tray icon, adjustable lyric shadow, single-line lyric display, and a lyric-matching fix) and is not affiliated with or endorsed by the original authors. For the original, unmodified project, please go to **https://github.com/juliocax/FrontLine-Lyrics-Desktop**.
+> **⚠️ This is not the original project.** This is a personal fork/enhancement of **[FrontLine Lyrics Desktop](https://github.com/juliocax/FrontLine-Lyrics-Desktop)** by [@juliocax](https://github.com/juliocax) and contributors — all credit for the original application goes to them. This fork is **only available by cloning this repository and building it yourself** (it is not published on the Microsoft Store or anywhere else). For the original, unmodified project, go to **https://github.com/juliocax/FrontLine-Lyrics-Desktop**.
 
-## Table of Contents
+## Features (Original App)
 
-- [Introduction](#introduction)
-- [Features](#features)
-- [How It Works](#how-it-works)
-- [Technologies Used](#technologies-used)
-- [Installation](#installation)
-- [Usage Guide](#usage-guide)
-- [Screenshots](#screenshots)
-- [Building From Source](#building-from-source)
-- [Running Tests](#running-tests)
-- [Contributing](#contributing)
-- [Contributors](#contributors)
-- [Support the Project](#support-the-project)
-- [License](#license)
+- **Automatic track detection** via Windows Media Session (SMTC) — reads title, artist and playback position straight from any compatible player.
+- **Audio-fingerprint recognition** as a fallback/primary source, using Shazam to identify what's playing from system audio.
+- **Auto mode** that continuously re-listens and re-syncs as tracks change.
+- **Pause-aware sync** — pausing the track pauses the lyrics too.
+- **Live translation** into English, Spanish, French, Portuguese, or a romanized transliteration.
+- **Manual search** for lyrics and cover art by artist/song name.
+- **Playback shortcuts** (previous/next track) and manual sync-time adjustment, built into the overlay.
+- **Adjustable font size** and a draggable, always-on-top, transparent overlay window.
+- **Multi-language UI**: English, Portuguese, and Spanish.
 
-## Introduction
+## Features (This Enhancement)
 
-FrontLine Lyrics is a always-on-top overlay for Windows that listens to whatever is playing on your system and shows synced lyrics in real time, Spotify, YouTube, Apple Music, a local media player, or anything else that comes out of your speakers.
-
-It works two ways, it can automatically follow the track info exposed by Windows' native media session (title, artist, playback position), and it can also *listen* to your system audio directly and recognize the song with Shazam, so it still works with sources that don't expose media metadata at all.
-
-## Features
-
-- **Automatic track detection**: via Windows Media Session (SMTC) reads title, artist and playback position straight from any compatible player, with no manual input.
-- **Audio-fingerprint recognition**: as a fallback/primary source, records a snippet of system audio (WASAPI loopback) and identifies the song with Shazam.
-- **Auto mode**: continuously re-listens and re-syncs as tracks change, with adaptive retry backoff and a cooldown guard against false "previous track" triggers.
-- **Synced lyrics display**: an always-on-top, transparent, draggable overlay window showing the current lyric line in time with the music, with a bold, adjustable shadow so it stays readable over any background.
-- **Pause-aware sync**: pausing the track pauses the lyrics scroll too, so everything stays perfectly aligned when playback resumes.
-- **Live translation**: translate the displayed lyrics into English, Spanish, French, Portuguese, or a romanized transliteration, resolved in parallel across multiple translation backends for reliability.
-- **Manual search**: look up lyrics and cover art by artist/song name when you'd rather not rely on auto-detection.
-- **Playback shortcuts**: previous/next track controls built right into the lyrics view, plus manual sync-time adjustment, all without leaving the overlay.
-- **Customizable overlay**: adjustable font size, adjustable lyric shadow thickness (from none to very bold), and a compact/expanded layout.
-- **Pin (click-through lock)**: right-click the tray icon and toggle **Pin** to lock the overlay in place — while pinned, mouse clicks pass straight through the whole window to whatever's behind it, so it never gets in the way or gets accidentally dragged.
-- **Multi-language UI**: interface available in English, Portuguese, and Spanish.
-
-## How It Works
-
-FrontLine Lyrics is split into two cooperating processes:
-
-1. **`FrontlineServer` (Python, headless)** — the audio/recognition engine. It captures system audio via WASAPI loopback, talks to the Windows Media Session API for auto-follow, fingerprints audio snippets with Shazam, fetches synced lyrics from LRCLIB, and runs translations. It's packaged as a standalone `.exe` with PyInstaller and exposes a local WebSocket server.
-2. **`FrontLineOverlay` (C# / WPF)** — the visible overlay window. It launches the Python server as a child process on startup and communicates with it exclusively over the WebSocket, sending commands (`LISTEN`, `AUTO_TOGGLE`, `TRANSLATE`, `MANUAL_SEARCH`, etc.) and receiving live state broadcasts to render.
-
-## Technologies Used
-
-| Layer | Stack |
-|---|---|
-| Desktop overlay | C#, WPF (.NET) |
-| Backend / audio engine | Python 3.13, `asyncio`, `websockets` |
-| Audio capture | `pyaudiowpatch` (WASAPI loopback) |
-| Song recognition | `shazamio` |
-| Lyrics source | [LRCLIB](https://lrclib.net/) |
-| Translation | `deep-translator`, `translators` (parallel multi-backend resolution) |
-| Media metadata (auto-follow) | Windows Runtime — `GlobalSystemMediaTransportControlsSessionManager` via `winrt` |
-| Packaging | PyInstaller (server), MSIX (Microsoft Store) |
-| Testing | `pytest`, `pytest-asyncio`, `pytest-mock`, `requests-mock` |
-
+- **Pin (click-through lock)**: right-click the tray icon and toggle **Pin** to lock the overlay in place — while pinned, mouse clicks pass straight through the whole window to whatever's behind it, so it never gets in the way or gets accidentally dragged, and it stops changing opacity on hover.
+- **Adjustable lyric shadow**: a Settings slider controls how bold the dark outline behind the lyrics is, from none to very thick, with a solid black core so it stays dark even at maximum thickness.
+- **Single-line lyric display**: shows only the current line instead of previous/current/next, for a cleaner look.
+- **Lyric-matching fix**: cross-checks track duration when picking a lyrics match from LRCLIB, fixing cases where a same-artist, differently-titled song (e.g. "Stranger" vs "The Stranger") was shown instead of the real match.
+- App icon embedded in the built `.exe` and its shortcut.
 
 ## Installation
 
-The easiest way to install FrontLine Lyrics is through the Microsoft Store:
+This fork isn't packaged or published anywhere — build it from source:
 
-<a href="https://get.microsoft.com/installer/download/9P6LNJCL8ZCC?referrer=appbadge&cid=readme" target="_self">
-  <img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200"/>
-</a>
+1. Clone this repository:
+   ```
+   git clone https://github.com/kusnadin-ali/frontline-lyric-enhance.git
+   ```
+2. Install the [.NET 8 SDK](https://dotnet.microsoft.com/download) (`winget install Microsoft.DotNet.SDK.8` on Windows).
+3. Build and run:
+   ```
+   dotnet build Frontline/Frontline.csproj
+   Frontline\bin\Debug\net8.0-windows\Frontline.exe
+   ```
+   (Or open `Frontline.sln` in Visual Studio with the **.NET desktop development** workload installed, set `Frontline` as the startup project, and run it.)
 
+The Python backend (`FrontlineServer`) is already bundled as a prebuilt `.exe` in the repo, so no Python setup is needed unless you're modifying that part of the code.
+
+> **Windows Smart App Control**: if it's enabled in Enforce mode, it may silently block a freshly-built, unsigned `Frontline.exe`/`Frontline.dll` from launching (no error dialog — the process just exits). Either sign the build output with a locally-trusted certificate, or turn Smart App Control off in Windows Security (note: that's a one-way change, it can't be turned back on without reinstalling Windows).
 
 ## Usage Guide
 
-1. Launch FrontLine Lyrics, the overlay appears on top of your other windows.
+1. Launch FrontLine Lyrics — the overlay appears on top of your other windows.
 2. Play music in any app (Spotify, browser, local player, etc.).
 3. Click **LISTEN** to start automatic recognition/follow, or toggle **AUTO** to keep it continuously syncing as tracks change.
 4. Use **SEARCH** to look up lyrics by artist and song name directly.
 5. Use the translation toggles (Orig / Rom / EN / ES / FR / PT) to switch how the lyrics are displayed.
 6. Open **Settings** (⋮) to adjust font size, lyric shadow thickness, and background opacity; drag the window anywhere, and use the previous/next track buttons to control playback without leaving the overlay.
-7. Right-click the tray icon and check **Pin** to lock the overlay click-through in place (great for when it overlaps another window's controls); uncheck it the same way to go back to normal.
+7. Right-click the tray icon and check **Pin** to lock the overlay click-through in place; uncheck it the same way to go back to normal.
 
-## Screenshots
+---
 
-<p align="center">
-  <img src="Frontline/assets/help1.png" alt="Home screen" width="260"/>
-  <img src="Frontline/assets/help3.png" alt="Listening to a song" width="260"/>
-  <img src="Frontline/assets/help7.png" alt="Synced lyrics" width="260"/>
-</p>
-
-| Home screen | Listening | Synced lyrics |
-|---|---|---|
-| The initial screen when you open the overlay | Recognizing what's currently playing | Lyrics scrolling in sync with the music |
-
-## Building From Source
-
-Want to tinker with the code or build your own copy? Here's how:
-
-1. Clone the repository:
-   ```
-   git clone https://github.com/juliocax/FrontLine-Lyrics-Desktop.git
-   ```
-2. Open Visual Studio and make sure the **.NET desktop development** workload (which includes WPF tooling) is installed.
-3. Open [`Frontline.sln`](https://github.com/juliocax/FrontLine-Lyrics-Desktop/blob/main/Frontline.sln) in Visual Studio.
-4. Set [`Frontline`](https://github.com/juliocax/FrontLine-Lyrics-Desktop/tree/main/Frontline) as the startup project and run it.
-
-**Prefer the command line?** You don't need Visual Studio at all, just the [.NET 8 SDK](https://dotnet.microsoft.com/download) (`winget install Microsoft.DotNet.SDK.8` on Windows):
-
-```
-dotnet build Frontline/Frontline.csproj
-Frontline\bin\Debug\net8.0-windows\Frontline.exe
-```
-
-> **Windows Smart App Control**: if it's enabled in Enforce mode, it may silently block a freshly-built, unsigned `Frontline.exe`/`Frontline.dll` from launching (no error dialog — the process just exits). Either sign the build output with a locally-trusted certificate, or turn Smart App Control off in Windows Security (note: that's a one-way change, it can't be turned back on without reinstalling Windows).
-
-If you make changes to the Python backend (`FrontlineServer`), you'll also need to rebuild the standalone executable and swap it into the C# project so `Frontline` picks up your changes:
-
-1. From the `FrontlineServer` folder, rebuild the `.exe` with PyInstaller:
-   ```
-   pyinstaller --noconfirm --onedir --windowed --collect-all anyascii --collect-all winrt \
-     --hidden-import winrt.windows.media.control --hidden-import winrt.windows.storage.streams \
-     --hidden-import engine --hidden-import engine.crash_guard --hidden-import engine.media_session \
-     --hidden-import engine.music_manager --hidden-import engine.audio_capture \
-     --hidden-import engine.recognition --hidden-import engine.lyrics --hidden-import engine.cover_art \
-     --hidden-import engine.translation --hidden-import engine.smtc_policy --hidden-import engine.tuning \
-     --hidden-import engine.task_utils --hidden-import engine.workers --hidden-import engine.ws_server \
-     --name "FrontlineServer" "FrontlineServer.py"
-   ```
-2. From the `dist` folder created by PyInstaller, copy the `_internal` folder and `FrontlineServer.exe`, and use them to replace the existing ones in `Frontline/FrontlineServer`.
-3. Run the `Frontline` project again — it will launch your updated server automatically.
-
-## Running Tests
-
-The Python backend (`FrontlineServer/engine`) has a `pytest` suite covering the pure logic modules (SMTC clock-trust heuristics, lyrics parsing/matching, translation racing, cover art caching, `MusicManager` state helpers) with all external network calls mocked, so the tests run offline and don't touch Shazam, LRCLIB, Deezer or the translation backends for real.
-
-1. From the `FrontlineServer` folder, install the runtime and test dependencies:
-   ```
-   pip install -r requirements.txt
-   pip install -r requirements-dev.txt
-   ```
-2. Run the suite:
-   ```
-   pytest
-   ```
-   Or, from the repository root:
-   ```
-   pytest FrontlineServer/tests/
-   ```
-
-Tests run automatically on every pull request via GitHub Actions (see `.github/workflows/python-tests.yml`).
-
-## Contributing
-
-Contributions are welcome! Before opening a pull request:
-
-- Read [CONTRIBUTING.md](CONTRIBUTING.md) for how the project is organized, how to get set up on either side, and how to run the test suite.
-- This project follows the [Code of Conduct](CODE_OF_CONDUCT.md), please read it before participating in issues, PRs, or discussions.
-
-## Contributors
-
-See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the full list of people who have contributed code to this project.
-
-## Support the Project
-
-If FrontLine Lyrics is useful to you, consider [buying me a coffee](https://www.buymeacoffee.com/juliocax).
-
-## License
-
-Distributed under the MIT License. See [LICENSE](LICENSE.txt) for more information.
+Licensed under the MIT License (see [LICENSE.txt](LICENSE.txt)), same as the original project.
