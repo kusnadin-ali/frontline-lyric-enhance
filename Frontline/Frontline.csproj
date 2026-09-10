@@ -6,9 +6,19 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>assets\logo.ico</ApplicationIcon>
     <Platforms>AnyCPU;x64</Platforms>
 	<RuntimeIdentifiers>win-x86;win-x64</RuntimeIdentifiers>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- UseWindowsForms adds global usings for System.Windows.Forms/System.Drawing that
+         collide with WPF's System.Windows/System.Windows.Media namespaces; the tray icon
+         code references those Forms/Drawing types fully-qualified instead. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Update="assets\black-button.png">
@@ -56,4 +66,14 @@
   <ItemGroup>
     <Folder Include="FrontlineServer\" />
   </ItemGroup>
+
+  <!-- Local dev convenience: Windows Smart App Control blocks freshly-rebuilt, unsigned
+       binaries. If this machine has the local "FrontLineLyrics Dev Local" self-signed cert
+       (see memory/avast_ssl_interception_fix.md-adjacent notes), auto-sign the output so the
+       app runs without needing manual Set-AuthenticodeSignature after every build. Silently
+       does nothing on a machine without that cert (e.g. a fresh clone). -->
+  <Target Name="SignForSmartAppControl" AfterTargets="Build" Condition="'$(OS)' == 'Windows_NT'">
+    <Exec Command="powershell -NoProfile -Command &quot;$c = Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Subject -eq 'CN=FrontLineLyrics Dev Local' } | Select-Object -First 1; if ($c) { Set-AuthenticodeSignature -FilePath '$(TargetDir)$(TargetName).exe' -Certificate $c -HashAlgorithm SHA256 | Out-Null; Set-AuthenticodeSignature -FilePath '$(TargetDir)$(TargetName).dll' -Certificate $c -HashAlgorithm SHA256 | Out-Null }&quot;"
+          ContinueOnError="WarnAndContinue" />
+  </Target>
 </Project>

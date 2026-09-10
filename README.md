@@ -24,6 +24,8 @@ https://github.com/user-attachments/assets/0a6f3278-49b2-43f0-9004-6709d65f74b9
 
 ---
 
+> **⚠️ This is not the original project.** This is a personal fork/enhancement of **[FrontLine Lyrics Desktop](https://github.com/juliocax/FrontLine-Lyrics-Desktop)** by [@juliocax](https://github.com/juliocax) and contributors — all credit for the original application goes to them. This fork adds a few extra features on top (overlay pin/click-through lock via tray icon, adjustable lyric shadow, single-line lyric display, and a lyric-matching fix) and is not affiliated with or endorsed by the original authors. For the original, unmodified project, please go to **https://github.com/juliocax/FrontLine-Lyrics-Desktop**.
+
 ## Table of Contents
 
 - [Introduction](#introduction)
@@ -51,12 +53,13 @@ It works two ways, it can automatically follow the track info exposed by Windows
 - **Automatic track detection**: via Windows Media Session (SMTC) reads title, artist and playback position straight from any compatible player, with no manual input.
 - **Audio-fingerprint recognition**: as a fallback/primary source, records a snippet of system audio (WASAPI loopback) and identifies the song with Shazam.
 - **Auto mode**: continuously re-listens and re-syncs as tracks change, with adaptive retry backoff and a cooldown guard against false "previous track" triggers.
-- **Synced lyrics display**: an always-on-top, transparent, draggable overlay window that scrolls lyrics in time with the music.
+- **Synced lyrics display**: an always-on-top, transparent, draggable overlay window showing the current lyric line in time with the music, with a bold, adjustable shadow so it stays readable over any background.
 - **Pause-aware sync**: pausing the track pauses the lyrics scroll too, so everything stays perfectly aligned when playback resumes.
 - **Live translation**: translate the displayed lyrics into English, Spanish, French, Portuguese, or a romanized transliteration, resolved in parallel across multiple translation backends for reliability.
 - **Manual search**: look up lyrics and cover art by artist/song name when you'd rather not rely on auto-detection.
 - **Playback shortcuts**: previous/next track controls built right into the lyrics view, plus manual sync-time adjustment, all without leaving the overlay.
-- **Customizable overlay**: adjustable font size and a compact/expanded layout.
+- **Customizable overlay**: adjustable font size, adjustable lyric shadow thickness (from none to very bold), and a compact/expanded layout.
+- **Pin (click-through lock)**: right-click the tray icon and toggle **Pin** to lock the overlay in place — while pinned, mouse clicks pass straight through the whole window to whatever's behind it, so it never gets in the way or gets accidentally dragged.
 - **Multi-language UI**: interface available in English, Portuguese, and Spanish.
 
 ## How It Works
@@ -97,7 +100,8 @@ The easiest way to install FrontLine Lyrics is through the Microsoft Store:
 3. Click **LISTEN** to start automatic recognition/follow, or toggle **AUTO** to keep it continuously syncing as tracks change.
 4. Use **SEARCH** to look up lyrics by artist and song name directly.
 5. Use the translation toggles (Orig / Rom / EN / ES / FR / PT) to switch how the lyrics are displayed.
-6. Adjust font size, drag the window anywhere, and use the previous/next track buttons to control playback without leaving the overlay.
+6. Open **Settings** (⋮) to adjust font size, lyric shadow thickness, and background opacity; drag the window anywhere, and use the previous/next track buttons to control playback without leaving the overlay.
+7. Right-click the tray icon and check **Pin** to lock the overlay click-through in place (great for when it overlaps another window's controls); uncheck it the same way to go back to normal.
 
 ## Screenshots
 
@@ -122,6 +126,15 @@ Want to tinker with the code or build your own copy? Here's how:
 2. Open Visual Studio and make sure the **.NET desktop development** workload (which includes WPF tooling) is installed.
 3. Open [`Frontline.sln`](https://github.com/juliocax/FrontLine-Lyrics-Desktop/blob/main/Frontline.sln) in Visual Studio.
 4. Set [`Frontline`](https://github.com/juliocax/FrontLine-Lyrics-Desktop/tree/main/Frontline) as the startup project and run it.
+
+**Prefer the command line?** You don't need Visual Studio at all, just the [.NET 8 SDK](https://dotnet.microsoft.com/download) (`winget install Microsoft.DotNet.SDK.8` on Windows):
+
+```
+dotnet build Frontline/Frontline.csproj
+Frontline\bin\Debug\net8.0-windows\Frontline.exe
+```
+
+> **Windows Smart App Control**: if it's enabled in Enforce mode, it may silently block a freshly-built, unsigned `Frontline.exe`/`Frontline.dll` from launching (no error dialog — the process just exits). Either sign the build output with a locally-trusted certificate, or turn Smart App Control off in Windows Security (note: that's a one-way change, it can't be turned back on without reinstalling Windows).
 
 If you make changes to the Python backend (`FrontlineServer`), you'll also need to rebuild the standalone executable and swap it into the C# project so `Frontline` picks up your changes:
 

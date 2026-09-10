@@ -487,7 +487,7 @@ class MusicManager:
             return
         self._media_busy = True
         try:
-            letra = lyrics_mod.fetch_lyrics_lrclib(info.artista, info.titulo)
+            letra = lyrics_mod.fetch_lyrics_lrclib(info.artista, info.titulo, duration=info.duracao or None)
             if letra:
                 if self._listen_use_shazam:
                     logging.info("OUVIR em curso: ignora lock-in SMTC tardio")

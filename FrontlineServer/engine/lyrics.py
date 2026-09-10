@@ -21,6 +21,11 @@ _DASH_SUFFIX = re.compile(
     re.I,
 )
 
+# "Stranger" vs "The Stranger" passes names_are_close's substring check but is
+# a different song; cross-checking track length catches that without needing
+# an exact title match.
+_DURATION_TOLERANCE_SEC = 12
+
 
 def clean_lrclib_query(artist: str, song: str) -> Tuple[str, str]:
     """Strip Shazam-style noise from the title/artist so it looks like what LRCLIB indexes."""
@@ -71,14 +76,23 @@ def parse_synced_lrc(synced_lyrics: str) -> List[Dict[str, Any]]:
     return lines
 
 
-def pick_lrclib_search_hit(results: Any, artist: str, song: str) -> Optional[Dict[str, Any]]:
+def pick_lrclib_search_hit(
+    results: Any, artist: str, song: str, duration: Optional[float] = None
+) -> Optional[Dict[str, Any]]:
     """Pick a search result with synced lyrics; does not require an exact artist match."""
     if not isinstance(results, list):
         return None
+    candidates = [item for item in results if isinstance(item, dict) and item.get("syncedLyrics")]
+    if duration:
+        candidates = [
+            c for c in candidates
+            if not c.get("duration") or abs(c["duration"] - duration) <= _DURATION_TOLERANCE_SEC
+        ]
+        if not candidates:
+            return None
+
     scored: List[Tuple[int, Dict[str, Any]]] = []
-    for item in results:
-        if not isinstance(item, dict) or not item.get("syncedLyrics"):
-            continue
+    for item in candidates:
         score = 0
         if names_are_close(artist, item.get("artistName") or ""):
             score += 2
@@ -87,9 +101,7 @@ def pick_lrclib_search_hit(results: Any, artist: str, song: str) -> Optional[Dic
         if score > 0:
             scored.append((score, item))
     if not scored:
-        for item in results:
-            if not isinstance(item, dict) or not item.get("syncedLyrics"):
-                continue
+        for item in candidates:
             if names_are_close(song, item.get("trackName") or ""):
                 return item
         return None
@@ -97,7 +109,9 @@ def pick_lrclib_search_hit(results: Any, artist: str, song: str) -> Optional[Dic
     return scored[0][1]
 
 
-def fetch_lyrics_lrclib(artist: str, song: str) -> Optional[List[Dict[str, Any]]]:
+def fetch_lyrics_lrclib(
+    artist: str, song: str, duration: Optional[float] = None
+) -> Optional[List[Dict[str, Any]]]:
     """Fetch synced lyrics from the LRCLIB API.
 
     Tries the exact /api/get first (fast when the name already matches
@@ -151,7 +165,7 @@ def fetch_lyrics_lrclib(artist: str, song: str) -> Optional[List[Dict[str, Any]]
         )
         if r.status_code != 200:
             return None
-        hit = pick_lrclib_search_hit(r.json(), who, track)
+        hit = pick_lrclib_search_hit(r.json(), who, track, duration=duration)
         if hit and hit.get("syncedLyrics"):
             lines = parse_synced_lrc(hit["syncedLyrics"])
             if lines:
@@ -194,7 +208,9 @@ def fetch_lyrics_lrclib(artist: str, song: str) -> Optional[List[Dict[str, Any]]
     return None
 
 
-def fetch_lyrics_from_candidates(pairs: List[Tuple[str, str]]) -> Optional[List[Dict[str, Any]]]:
+def fetch_lyrics_from_candidates(
+    pairs: List[Tuple[str, str]], duration: Optional[float] = None
+) -> Optional[List[Dict[str, Any]]]:
     """Try several (artist, title) pairs until LRCLIB returns synced lyrics."""
     seen = set()
     for artist, song in pairs:
@@ -202,7 +218,7 @@ def fetch_lyrics_from_candidates(pairs: List[Tuple[str, str]]) -> Optional[List[
         if not key[1] or key in seen:
             continue
         seen.add(key)
-        lines = fetch_lyrics_lrclib(artist, song)
+        lines = fetch_lyrics_lrclib(artist, song, duration=duration)
         if lines:
             return lines
     return None

@@ -8,13 +8,14 @@
 
     <Window.Resources>
         <!-- Halo atrás da letra: glow escuro (ShadowDepth=0), para leitura sobre
-             conteúdo claro quando o overlay flutua. Contribuição de Warith Adetayo. -->
+             conteúdo claro quando o overlay flutua. Contribuição de Warith Adetayo.
+             DynamicResource (not StaticResource) because the Shadow slider replaces this
+             resource entry wholesale at runtime, since a shared StaticResource Freezable gets
+             frozen read-only once the Style is sealed, so mutating its properties later
+             throws; swapping the whole resource via DynamicResource sidesteps that. -->
+        <DropShadowEffect x:Key="LyricShadowEffect" Color="Black" BlurRadius="6" ShadowDepth="0" Opacity="1"/>
         <Style x:Key="LyricHalo" TargetType="TextBlock">
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect Color="Black" BlurRadius="12" ShadowDepth="0" Opacity="0.85"/>
-                </Setter.Value>
-            </Setter>
+            <Setter Property="Effect" Value="{DynamicResource LyricShadowEffect}"/>
         </Style>
 
         <Style x:Key="ToggleSwitchStyle" TargetType="ToggleButton">
@@ -427,10 +428,16 @@
 
                     <Grid x:Name="LyricsNormalView" Grid.Row="0" IsHitTestVisible="False">
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock x:Name="LblPrevious" Style="{StaticResource LyricHalo}" Foreground="#555555" FontSize="14" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                            <TextBlock x:Name="LblCurrent" Style="{StaticResource LyricHalo}" Foreground="#FFCC33" FontSize="26" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="LblPrevious" Style="{StaticResource LyricHalo}" Foreground="#555555" FontSize="14" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed"/>
+                            <Grid>
+                                <!-- Solid black copy behind LblCurrent: a blurred shadow alone dilutes to gray
+                                     at high BlurRadius (thin strokes spread thin), this keeps a fully-opaque
+                                     black core under the glow regardless of shadow thickness. -->
+                                <TextBlock x:Name="LblCurrentShadowBase" Foreground="Black" FontSize="26" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding Text, ElementName=LblCurrent}" Visibility="Collapsed"/>
+                                <TextBlock x:Name="LblCurrent" Style="{StaticResource LyricHalo}" Foreground="#FFCC33" FontSize="26" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"/>
+                            </Grid>
                             <TextBlock x:Name="LblCurrentOriginal" Style="{StaticResource LyricHalo}" Foreground="#99FFFFFF" FontSize="14" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed"/>
-                            <TextBlock x:Name="LblNext" Style="{StaticResource LyricHalo}" Foreground="#555555" FontSize="14" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                            <TextBlock x:Name="LblNext" Style="{StaticResource LyricHalo}" Foreground="#555555" FontSize="14" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"/>
                         </StackPanel>
                     </Grid>
 
@@ -644,6 +651,16 @@
                             <Slider x:Name="SldFontSize" Style="{StaticResource GlassSlider}" Minimum="14" Maximum="80" Value="26" VerticalAlignment="Center" Margin="0,0,10,0" ValueChanged="SldFontSize_ValueChanged"/>
                             <Button Grid.Column="1" Content="↺" Style="{StaticResource SquareGlassButton}" Width="24" Height="24" Padding="0" FontSize="12" Click="BtnResetFont_Click"/>
                         </Grid>
+
+                        <TextBlock x:Name="LblShadowTitle" Text="LYRIC SHADOW" Foreground="#66FFFFFF" FontSize="9" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <Grid Margin="0,0,0,15">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Slider x:Name="SldShadow" Style="{StaticResource GlassSlider}" Minimum="0" Maximum="24" Value="6" VerticalAlignment="Center" Margin="0,0,10,0" ValueChanged="SldShadow_ValueChanged"/>
+                            <Button Grid.Column="1" Content="↺" Style="{StaticResource SquareGlassButton}" Width="24" Height="24" Padding="0" FontSize="12" Click="BtnResetShadow_Click"/>
+                        </Grid>
                     </StackPanel>
 
                     <!-- Slider de Opacidade: fica sempre visível (é o controle que a prévia serve) -->
@@ -666,10 +683,13 @@
             <Grid Margin="20">
                 <TextBlock x:Name="LblPreviewTag" Text="PREVIEW" Foreground="#33FFFFFF" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Top"/>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock x:Name="LblPreviewPrevious" Style="{StaticResource LyricHalo}" Foreground="#777777" FontSize="14" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                    <TextBlock x:Name="LblPreviewCurrent" Style="{StaticResource LyricHalo}" Foreground="#FFCC33" FontSize="26" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="LblPreviewPrevious" Style="{StaticResource LyricHalo}" Foreground="#777777" FontSize="14" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed"/>
+                    <Grid>
+                        <TextBlock x:Name="LblPreviewCurrentShadowBase" Foreground="Black" FontSize="26" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding Text, ElementName=LblPreviewCurrent}" Visibility="Collapsed"/>
+                        <TextBlock x:Name="LblPreviewCurrent" Style="{StaticResource LyricHalo}" Foreground="#FFCC33" FontSize="26" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"/>
+                    </Grid>
                     <TextBlock x:Name="LblPreviewCurrentOriginal" Style="{StaticResource LyricHalo}" Foreground="#B3FFFFFF" FontSize="14" FontWeight="SemiBold" TextAlignment="Center" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="Collapsed"/>
-                    <TextBlock x:Name="LblPreviewNext" Style="{StaticResource LyricHalo}" Foreground="#777777" FontSize="14" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                    <TextBlock x:Name="LblPreviewNext" Style="{StaticResource LyricHalo}" Foreground="#777777" FontSize="14" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"/>
                 </StackPanel>
             </Grid>
         </Border>

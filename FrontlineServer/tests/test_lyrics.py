@@ -100,6 +100,32 @@ def test_pick_lrclib_search_hit_returns_none_when_nothing_matches():
     assert lyrics.pick_lrclib_search_hit("not-a-list", "Drake", "Take Care") is None
 
 
+def test_pick_lrclib_search_hit_rejects_duration_mismatch():
+    # "Stranger" is a substring of "The Stranger" (different, much longer song by
+    # the same artist) so names_are_close alone would wrongly prefer it.
+    results = [
+        {"artistName": "Dijon", "trackName": "The Stranger", "syncedLyrics": "wrong song", "duration": 270},
+        {"artistName": "Dijon", "trackName": "Stranger", "syncedLyrics": "right song", "duration": 169},
+    ]
+    hit = lyrics.pick_lrclib_search_hit(results, "Dijon", "Stranger", duration=170)
+    assert hit["syncedLyrics"] == "right song"
+
+
+def test_pick_lrclib_search_hit_none_when_only_duration_mismatches():
+    results = [
+        {"artistName": "Dijon", "trackName": "The Stranger", "syncedLyrics": "wrong song", "duration": 270},
+    ]
+    assert lyrics.pick_lrclib_search_hit(results, "Dijon", "Stranger", duration=170) is None
+
+
+def test_pick_lrclib_search_hit_ignores_duration_when_not_provided():
+    results = [
+        {"artistName": "Dijon", "trackName": "The Stranger", "syncedLyrics": "only option", "duration": 270},
+    ]
+    hit = lyrics.pick_lrclib_search_hit(results, "Dijon", "Stranger")
+    assert hit["syncedLyrics"] == "only option"
+
+
 # fetch_lyrics_lrclib (network mocked)
 
 def test_fetch_lyrics_lrclib_uses_exact_get_endpoint(requests_mock):

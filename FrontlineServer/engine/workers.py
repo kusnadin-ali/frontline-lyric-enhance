@@ -117,8 +117,9 @@ async def background_verification_worker(manager):
             else:
                 queries.append(smtc_pair)
 
+        duration = (info.duracao or None) if info is not None else None
         found_lyrics = await loop.run_in_executor(
-            None, lyrics.fetch_lyrics_from_candidates, queries
+            None, lyrics.fetch_lyrics_from_candidates, queries, duration
         )
 
         if manager.session_id == current_session and not manager.search_completed:

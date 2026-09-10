@@ -14,6 +14,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using System.Linq;
@@ -63,12 +64,14 @@ namespace FrontLineOverlay
 
         private bool isGhostMode = false;
         private bool isResizing = false;
+        private bool isPinned = false;
         private bool isManualSyncMode = false;
         private string serverPort = "8765";
         private string currentAppStatus = "IDLE";
         private string currentCoverUrl = "";
         private ClientWebSocket? _webSocket;
         private double bgOpacity = 0.8;
+        private double shadowBlur = 6;
         private bool keepOriginalWithTranslation = false;
         private string lastCurrentLyricsOriginal = "";
         private bool lastIsTranslatedActive = false;
@@ -122,7 +125,8 @@ namespace FrontLineOverlay
                 { "HistorySong", "Song" }, { "HistoryDate", "Date" },
                 { "HistoryEmpty", "No searches yet." }, { "HistoryRemove", "Remove" },
                 { "FontSizeTitle", "FONT SIZE" },
-                { "BgOpacityTitle", "BACKGROUND OPACITY" }
+                { "BgOpacityTitle", "BACKGROUND OPACITY" },
+                { "ShadowTitle", "LYRIC SHADOW" }
             }},
             { "pt", new() {
                 { "Listen", "OUVIR" }, { "Search", "⌕ BUSCAR" }, { "ManualSearch", "BUSCA MANUAL" },
@@ -141,7 +145,8 @@ namespace FrontLineOverlay
                 { "HistorySong", "Música" }, { "HistoryDate", "Data" },
                 { "HistoryEmpty", "Nenhuma busca ainda." }, { "HistoryRemove", "Remover" },
                 { "FontSizeTitle", "TAMANHO DA FONTE" },
-        { "BgOpacityTitle", "OPACIDADE DO FUNDO" }
+        { "BgOpacityTitle", "OPACIDADE DO FUNDO" },
+        { "ShadowTitle", "SOMBRA DA LETRA" }
             }},
             { "es", new() {
                 { "Listen", "ESCUCHAR" }, { "Search", "⌕ BUSCAR" }, { "ManualSearch", "BÚSQUEDA MANUAL" },
@@ -158,7 +163,7 @@ namespace FrontLineOverlay
                 { "PrevTrack", "Pista anterior" }, { "NextTrack", "Pista siguiente" },
                 { "SearchHistory", "HISTORIAL DE BÚSQUEDA" }, { "HistoryArtist", "Artista" },
                 { "HistorySong", "Canción" }, { "HistoryDate", "Fecha" },
-                { "HistoryEmpty", "Aún no hay búsquedas." }, { "HistoryRemove", "Quitar" },{ "FontSizeTitle", "TAMAÑO DE FUENTE" },{ "BgOpacityTitle", "OPACIDAD DE FONDO" }
+                { "HistoryEmpty", "Aún no hay búsquedas." }, { "HistoryRemove", "Quitar" },{ "FontSizeTitle", "TAMAÑO DE FUENTE" },{ "BgOpacityTitle", "OPACIDAD DE FONDO" },{ "ShadowTitle", "SOMBRA DE LA LETRA" }
             }}
         };
 
@@ -262,6 +267,39 @@ namespace FrontLineOverlay
                 SldFontSize.Value = 26; // Dispara o ValueChanged automaticamente, resetando o scale
         }
 
+        private void SldShadow_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            ApplyShadowIntensity(e.NewValue);
+            if (!_loadingSettings) ScheduleSave();
+        }
+
+        private void ApplyShadowIntensity(double blur)
+        {
+            shadowBlur = blur;
+            // Replacing the resource (not mutating the existing effect's properties) because
+            // a shared DropShadowEffect gets frozen read-only once the LyricHalo style is sealed.
+            Resources["LyricShadowEffect"] = new DropShadowEffect
+            {
+                Color = Colors.Black,
+                ShadowDepth = 0,
+                BlurRadius = blur,
+                Opacity = blur <= 0 ? 0 : 1
+            };
+
+            // Solid black copy behind the current-line label: a blurred shadow alone dilutes to
+            // gray at high BlurRadius (thin strokes spread thin over a wide radius), so this keeps
+            // a fully-opaque black core under the glow regardless of shadow thickness.
+            var baseVisibility = blur <= 0 ? Visibility.Collapsed : Visibility.Visible;
+            if (LblCurrentShadowBase != null) LblCurrentShadowBase.Visibility = baseVisibility;
+            if (LblPreviewCurrentShadowBase != null) LblPreviewCurrentShadowBase.Visibility = baseVisibility;
+        }
+
+        private void BtnResetShadow_Click(object sender, RoutedEventArgs e)
+        {
+            if (SldShadow != null)
+                SldShadow.Value = 6; // Dispara o ValueChanged automaticamente, resetando o efeito
+        }
+
         public MainWindow()
         {
             const string appName = "FrontLineLyrics_UniqueMutex";
@@ -290,6 +328,7 @@ namespace FrontLineOverlay
 
             RestoreFontAndAuto();
             InitSearchHistory();
+            InitTrayIcon();
 
             _mouseTracker.Tick += MouseTracker_Tick;
             _mouseTracker.Start();
@@ -466,6 +505,7 @@ namespace FrontLineOverlay
             _mouseTracker.Stop();
             _ghostTimer.Stop();
             _opacityPreviewTimer.Stop();
+            if (_trayIcon != null) { _trayIcon.Visible = false; _trayIcon.Dispose(); }
             ShutdownEngine();
             base.OnClosed(e);
         }
@@ -501,6 +541,7 @@ namespace FrontLineOverlay
             LblSearchHistoryEmpty.Text = t["HistoryEmpty"];
             LblFontSizeTitle.Text = t["FontSizeTitle"];
             LblBgOpacityTitle.Text = t["BgOpacityTitle"];
+            LblShadowTitle.Text = t["ShadowTitle"];
             RefreshHistoryHeaders();
             RefreshHistoryDateLabels();
 
@@ -521,6 +562,7 @@ namespace FrontLineOverlay
 
         private void MouseTracker_Tick(object? sender, EventArgs e)
         {
+            if (isPinned) { _ghostTimer.Stop(); return; }
             if (currentAppStatus == "IDLE" || HelpOverlay.Visibility == Visibility.Visible || BtnMenu.IsChecked == true || SearchInputPanel.Visibility == Visibility.Visible || isResizing)
             {
                 _ghostTimer.Stop();
@@ -557,7 +599,9 @@ namespace FrontLineOverlay
         private void UpdateVisualState(bool enableGhost)
         {
             if (isResizing) return;
-            isGhostMode = enableGhost;
+            // Pinned always wins over whatever ghost state was requested, so the overlay
+            // stays click-through regardless of mouse hover while pinned.
+            isGhostMode = enableGhost || (isPinned && currentAppStatus != "IDLE" && SearchInputPanel.Visibility != Visibility.Visible);
             IntPtr hwnd = new WindowInteropHelper(this).Handle;
             if (hwnd == IntPtr.Zero) return;
             int GWL_EXSTYLE = -20;
@@ -1023,6 +1067,58 @@ namespace FrontLineOverlay
 
         private void BtnRestore_Click(object sender, RoutedEventArgs e) { this.WindowState = WindowState.Normal; }
         private void Window_MouseLeftButtonDown(object sender, MouseButtonEventArgs e) { if (!isGhostMode) DragMove(); }
+
+        // Pin: whole window becomes click-through (same WS_EX_TRANSPARENT mechanism as
+        // ghost mode) and stays that way regardless of mouse hover, so clicks anywhere
+        // over the overlay -- including windows/controls peeking out from underneath it --
+        // reach whatever is behind instead of grabbing/dragging the overlay. Since the
+        // whole window is unreachable while pinned, toggling is done from the tray icon's
+        // context menu instead of an in-window button.
+        private System.Windows.Forms.NotifyIcon? _trayIcon;
+        private System.Windows.Forms.ToolStripMenuItem? _trayPinItem;
+
+        private void InitTrayIcon()
+        {
+            try
+            {
+                System.Drawing.Icon? icon = null;
+                try
+                {
+                    string logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "assets", "logo.png");
+                    if (File.Exists(logoPath))
+                    {
+                        using var bmp = new System.Drawing.Bitmap(logoPath);
+                        icon = System.Drawing.Icon.FromHandle(bmp.GetHicon());
+                    }
+                }
+                catch (Exception ex) { CrashReporter.Log(ex, "InitTrayIcon.Icon"); }
+
+                _trayPinItem = new System.Windows.Forms.ToolStripMenuItem("Pin (lock, click-through)", null, (_, _) => SetPinned(!isPinned))
+                {
+                    CheckOnClick = false,
+                    Checked = isPinned
+                };
+                var menu = new System.Windows.Forms.ContextMenuStrip();
+                menu.Items.Add(_trayPinItem);
+
+                _trayIcon = new System.Windows.Forms.NotifyIcon
+                {
+                    Icon = icon ?? System.Drawing.SystemIcons.Application,
+                    Text = "FrontLine Lyrics",
+                    Visible = true,
+                    ContextMenuStrip = menu
+                };
+            }
+            catch (Exception ex) { CrashReporter.Log(ex, "InitTrayIcon"); }
+        }
+
+        private void SetPinned(bool pinned)
+        {
+            isPinned = pinned;
+            if (_trayPinItem != null) _trayPinItem.Checked = pinned;
+            if (!isResizing) UpdateVisualState(isGhostMode);
+            PersistSettings();
+        }
         private void ResizeGrip_DragDelta(object sender, DragDeltaEventArgs e) { Width = Math.Max(MinWidth, Width + e.HorizontalChange); Height = Math.Max(MinHeight, Height + e.VerticalChange); }
         private void BtnMinimize_Click(object sender, RoutedEventArgs e) { WindowState = WindowState.Minimized; }
 
@@ -1413,9 +1509,13 @@ namespace FrontLineOverlay
                 double font = AppSettings.GetDouble("FontSize", 26);
                 if (SldFontSize != null)
                     SldFontSize.Value = Math.Clamp(font, SldFontSize.Minimum, SldFontSize.Maximum);
+                double shadow = AppSettings.GetDouble("ShadowBlur", 6);
+                if (SldShadow != null)
+                    SldShadow.Value = Math.Clamp(shadow, SldShadow.Minimum, SldShadow.Maximum);
                 _wantAuto = AppSettings.GetBool("AutoMode", false);
                 if (BtnAutoSide != null)
                     BtnAutoSide.IsChecked = _wantAuto;
+                isPinned = AppSettings.GetBool("PinEnabled", false);
             }
             catch (Exception ex) { CrashReporter.Log(ex, "RestoreFontAndAuto"); }
             finally { _loadingSettings = false; }
@@ -1466,7 +1566,10 @@ namespace FrontLineOverlay
             {
                 if (SldFontSize != null)
                     AppSettings.SetDouble("FontSize", SldFontSize.Value);
+                if (SldShadow != null)
+                    AppSettings.SetDouble("ShadowBlur", SldShadow.Value);
                 AppSettings.SetBool("AutoMode", _wantAuto);
+                AppSettings.SetBool("PinEnabled", isPinned);
 
                 if (_suppressWindowSave) return;
                 if (HelpOverlay?.Visibility == Visibility.Visible) return;
