@@ -126,6 +126,25 @@ def test_pick_lrclib_search_hit_ignores_duration_when_not_provided():
     assert hit["syncedLyrics"] == "only option"
 
 
+def test_pick_lrclib_search_hit_title_only_match_needs_tight_duration():
+    # "Vital Signs" is a common title used by many unrelated songs/artists. A
+    # title-only match (artist doesn't match at all) that's merely "close" in
+    # duration (within the normal 12s tolerance) must still be rejected --
+    # only an almost-exact duration should be trusted without an artist match.
+    results = [
+        {"artistName": "OVERSIZE", "trackName": "Vital Signs", "syncedLyrics": "wrong song", "duration": 243},
+    ]
+    assert lyrics.pick_lrclib_search_hit(results, "AZKAL", "Vital Signs", duration=250) is None
+
+
+def test_pick_lrclib_search_hit_title_only_match_accepted_when_near_exact():
+    results = [
+        {"artistName": "Someone Else", "trackName": "Vital Signs", "syncedLyrics": "close enough", "duration": 251},
+    ]
+    hit = lyrics.pick_lrclib_search_hit(results, "AZKAL", "Vital Signs", duration=250)
+    assert hit["syncedLyrics"] == "close enough"
+
+
 # fetch_lyrics_lrclib (network mocked)
 
 def test_fetch_lyrics_lrclib_uses_exact_get_endpoint(requests_mock):

@@ -23,8 +23,12 @@ _DASH_SUFFIX = re.compile(
 
 # "Stranger" vs "The Stranger" passes names_are_close's substring check but is
 # a different song; cross-checking track length catches that without needing
-# an exact title match.
+# an exact title match. Used when the artist also matched.
 _DURATION_TOLERANCE_SEC = 12
+# Tighter tolerance for a title-only match (artist didn't match at all) -- common
+# titles ("Vital Signs", "Stranger", ...) are reused by many unrelated songs, so an
+# unconfirmed artist needs the runtime to be almost exact, not just "close enough".
+_DURATION_TOLERANCE_TITLE_ONLY_SEC = 3
 
 
 def clean_lrclib_query(artist: str, song: str) -> Tuple[str, str]:
@@ -79,31 +83,29 @@ def parse_synced_lrc(synced_lyrics: str) -> List[Dict[str, Any]]:
 def pick_lrclib_search_hit(
     results: Any, artist: str, song: str, duration: Optional[float] = None
 ) -> Optional[Dict[str, Any]]:
-    """Pick a search result with synced lyrics; does not require an exact artist match."""
+    """Pick a search result with synced lyrics; does not require an exact artist match,
+    but an unconfirmed artist gets a much tighter duration tolerance. A common title like
+    "Vital Signs" is shared by many unrelated songs, so a title-only match that also
+    happens to land within the normal tolerance can otherwise pick a completely different
+    song/artist just because the runtime is coincidentally close.
+    """
     if not isinstance(results, list):
         return None
-    candidates = [item for item in results if isinstance(item, dict) and item.get("syncedLyrics")]
-    if duration:
-        candidates = [
-            c for c in candidates
-            if not c.get("duration") or abs(c["duration"] - duration) <= _DURATION_TOLERANCE_SEC
-        ]
-        if not candidates:
-            return None
-
     scored: List[Tuple[int, Dict[str, Any]]] = []
-    for item in candidates:
-        score = 0
-        if names_are_close(artist, item.get("artistName") or ""):
-            score += 2
-        if names_are_close(song, item.get("trackName") or ""):
-            score += 2
-        if score > 0:
-            scored.append((score, item))
+    for item in results:
+        if not isinstance(item, dict) or not item.get("syncedLyrics"):
+            continue
+        artist_match = names_are_close(artist, item.get("artistName") or "")
+        title_match = names_are_close(song, item.get("trackName") or "")
+        if not artist_match and not title_match:
+            continue
+        if duration and item.get("duration"):
+            tolerance = _DURATION_TOLERANCE_SEC if artist_match else _DURATION_TOLERANCE_TITLE_ONLY_SEC
+            if abs(item["duration"] - duration) > tolerance:
+                continue
+        score = (2 if artist_match else 0) + (2 if title_match else 0)
+        scored.append((score, item))
     if not scored:
-        for item in candidates:
-            if names_are_close(song, item.get("trackName") or ""):
-                return item
         return None
     scored.sort(key=lambda pair: -pair[0])
     return scored[0][1]
